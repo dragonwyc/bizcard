@@ -418,3 +418,6 @@ $("export").addEventListener("click", async () => {
 window.addEventListener("resize", resizeCanvas);
 resizeCanvas();
 regenerate();
+// iOS Safari 会在地址栏收起/展开后才稳定
+// 延迟再算一次，防止高度偏小
+setTimeout(resizeCanvas, 300);
