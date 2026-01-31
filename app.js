@@ -39,97 +39,72 @@ function fileToImage(file) {
 }
 
 function buildVCard() {
-  const lines = [];
-  lines.push("BEGIN:VCARD");
-  lines.push("VERSION:3.0");
-  lines.push("CHARSET=UTF-8"); 
   // 基本
-  const fullName = $("name").value.trim();      // 显示名
-  const org      = $("org").value.trim();       // 公司/组织
-  const title    = $("title").value.trim();     // 职位
-  const dept     = ($("dept")?.value || "").trim(); // 部门（可选：如果你加了输入框）
-  const note     = ($("note")?.value || "").trim(); // 备注（可选）
+  const fullName = $("name").value.trim();
+  const org      = $("org").value.trim();
+  const title    = $("title").value.trim();
+  const note     = ($("note")?.value || "").trim();
 
-  // 联系方式（你可以在 UI 里加更多输入框：work/home/cell）
-  const telCell  = ($("tel")?.value || "").trim();      // 手机
-  const telWork  = ($("telWork")?.value || "").trim();  // 工作电话（可选）
-  const telHome  = ($("telHome")?.value || "").trim();  // 家庭电话（可选）
-
+  // 电话 / 邮件 / URL
+  const telCell  = ($("tel")?.value || "").trim();
   const email    = $("email").value.trim();
-  const emailWork= ($("emailWork")?.value || "").trim(); // 可选
   const url      = $("url").value.trim();
 
-  // 地址（可选：按 vCard 3.0 ADR 顺序：POBOX;EXT;STREET;LOCALITY;REGION;POSTAL;COUNTRY）
+  // 地址
   const street   = ($("street")?.value || "").trim();
   const city     = ($("city")?.value || "").trim();
-  const region   = ($("region")?.value || "").trim();   // 州/省
   const postal   = ($("postal")?.value || "").trim();
   const country  = ($("country")?.value || "").trim();
 
-  // 社交/IM（可选）
-  const imWechat = ($("wechat")?.value || "").trim();
+  // IM
+  const imWechat   = ($("wechat")?.value || "").trim();
   const imTelegram = ($("telegram")?.value || "").trim();
 
-  // 把“结构化姓名 N”尽量填好：姓;名;中间名;前缀;后缀
-  // 你现在只有一个“姓名”输入框：最稳的做法是把它放到“名”字段里，姓留空（兼容性仍很好）
+  // 结构化姓名
   const familyName = ($("familyName")?.value || "").trim();
   const givenName  = ($("givenName")?.value || "").trim();
 
-  // ===== 生成 vCard（按你提供的可扫格式）=====
+  // NOTE 合并（先拼好再写入）
+  let noteAll = note || "";
+  if (imWechat)   noteAll = noteAll ? `${noteAll} | WeChat: ${imWechat}` : `WeChat: ${imWechat}`;
+  if (imTelegram) noteAll = noteAll ? `${noteAll} | Telegram: ${imTelegram}` : `Telegram: ${imTelegram}`;
+
+  // 生成 vCard
   const lines = [];
   lines.push("BEGIN:VCARD");
   lines.push("VERSION:3.0");
-  
-  // FN / N（按你示例：Zhang San + Zhang;San）
-  // ===== FN / N（按示例：FN 显示名；N 结构化 姓;名）=====
+
   const displayName = fullName || [familyName, givenName].filter(Boolean).join(" ") || org || "";
-  
-  // 修改 FN 字段
-  if (displayName) {
-    lines.push(`FN;CHARSET=UTF-8:${escapeVC(displayName)}`); // 👈 关键修复2
-  } else {
-    lines.push("FN;CHARSET=UTF-8:");
-  }
-  
-  // 修改 N 字段
+  lines.push(`FN;CHARSET=UTF-8:${escapeVC(displayName)}`);
   lines.push(`N;CHARSET=UTF-8:${escapeVC(familyName)};${escapeVC(givenName || fullName)};;;`);
-  
-  // 修改 ORG 字段
-  if (org && title) {
-    lines.push(`ORG;CHARSET=UTF-8:${escapeVC(`${org} (${title})`)}`);
-  } else if (org) {
-    lines.push(`ORG;CHARSET=UTF-8:${escapeVC(org)}`);
+
+  if (org) {
+    // 你原来 ORG 想带 title，我保留这个逻辑
+    lines.push(`ORG;CHARSET=UTF-8:${escapeVC(title ? `${org} (${title})` : org)}`);
   }
-  
-  // 修改 ADR 字段
-  if (street || postal || city) {
-    lines.push(`ADR;CHARSET=UTF-8:;;${escapeVC(street)};;${escapeVC(postal)};${escapeVC(city)}`);
+  if (title) lines.push(`TITLE;CHARSET=UTF-8:${escapeVC(title)}`);
+
+  if (telCell) lines.push(`TEL;TYPE=CELL:${escapeVC(telCell)}`);
+  if (email)   lines.push(`EMAIL:${escapeVC(email)}`);
+  if (url)     lines.push(`URL:${escapeVC(url)}`);
+
+  // ADR 顺序：;;street;city;;postal;country
+  if (street || city || postal || country) {
+    lines.push(`ADR;CHARSET=UTF-8:;;${escapeVC(street)};${escapeVC(city)};;${escapeVC(postal)};${escapeVC(country)}`);
   }
-  
-  // 修改 NOTE 字段
+
   if (noteAll) lines.push(`NOTE;CHARSET=UTF-8:${escapeVC(noteAll)}`);
-  
-  // NOTE：把 wechat/telegram 也塞进 NOTE（别用 IMPP，避免扫码器丢字段）
-  let noteAll = note || "";
-  if (imWechat) noteAll = noteAll ? `${noteAll} | WeChat: ${imWechat}` : `WeChat: ${imWechat}`;
-  if (imTelegram) noteAll = noteAll ? `${noteAll} | Telegram: ${imTelegram}` : `Telegram: ${imTelegram}`;
-  if (noteAll) lines.push(`NOTE:${escapeVC(noteAll)}`);
-  
+
   lines.push("END:VCARD");
   return lines.join("\r\n");
 }
 
-// vCard 转义：\n ; , \ 都需要处理
 function escapeVC(s) {
   return String(s)
     .replace(/\\/g, "\\\\")
     .replace(/\r?\n/g, "\\n")
     .replace(/;/g, "\\;")
-    .replace(/,/g, "\\,")
-    // 确保Unicode字符正确编码
-    .replace(/[\u0080-\uFFFF]/g, c => 
-      `\\u${('000' + c.charCodeAt(0).toString(16)).slice(-4)}`
-    );
+    .replace(/,/g, "\\,");
 }
 
 // --- 生成二维码图（带 logo 挖空叠加） ---
