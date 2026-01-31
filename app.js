@@ -145,8 +145,8 @@ async function generateQRImage(text) {
   // 你之前用的是高纠错 H，这里保持一致
   const qr = new QRCode(tmp, {
     text,
-    width: 512,
-    height: 512,
+    width: 768,
+    height: 768,
     correctLevel: QRCode.CorrectLevel.H,
   });
 
@@ -244,7 +244,7 @@ function render() {
   // 二维码
   if (qrImg) {
     const base = Math.min(cw, ch) * 0.28; // 基础显示尺寸
-    const s = base * qrState.scale;
+    const s = Math.floor(base * qrState.scale);
 
     const x = Math.floor(qrState.x * cw);
     const y = Math.floor(qrState.y * ch);
@@ -255,12 +255,12 @@ function render() {
 
     // 给二维码加个白底圆角（更像名片）
     const r = Math.floor(s * 0.08);
-    roundRect(left - 10, top - 10, s + 20, s + 20, r + 8, "rgba(255,255,255,0.92)");
+    roundRect(left - 14, top - 14, s + 28, s + 28, r + 10, "#ffffff");
     ctx.drawImage(qrImg, left, top, s, s);
 
     // ===== 叠加 Logo 到二维码中心（如果用户上传了 logo）=====
     if (logoImg) {
-      const logoRatio = 0.22; // logo 占二维码宽度比例，可改 0.18~0.26
+      const logoRatio = 0.14; // logo 占二维码宽度比例，可改 0.18~0.26
       const logoSize = Math.floor(s * logoRatio);
     
       const lx = Math.floor(left + (s - logoSize) / 2);
