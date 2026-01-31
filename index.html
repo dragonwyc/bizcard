@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#111111" />
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+  <title>名片二维码生成器</title>
+
+  <style>
+    :root { --pad: 12px; }
+    body { margin: 0; font-family: -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial; background:#0b0b0b; color:#fff; }
+    .wrap { display: grid; grid-template-rows: auto 1fr; min-height: 100vh; }
+    header { padding: var(--pad); background: #111; position: sticky; top: 0; z-index: 10; }
+    header .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    header input, header button { height: 40px; border-radius: 10px; border: 1px solid #2a2a2a; background:#151515; color:#fff; padding: 0 10px; }
+    header button { cursor: pointer; }
+    header button.primary { background:#2b6cff; border-color:#2b6cff; }
+    header label { font-size: 12px; opacity: .9; display:flex; flex-direction:column; gap:6px; }
+    header .group { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
+    main { position: relative; }
+    canvas { width: 100vw; height: calc(100vh - 86px); display:block; touch-action: none; background:#000; }
+    .hint { position:absolute; left:12px; bottom:12px; background: rgba(0,0,0,.55); padding:10px 12px; border-radius:12px; font-size:12px; line-height:1.4; max-width: 85vw; }
+    .hint code { color:#9ad; }
+  </style>
+
+  <!-- 二维码库（纯前端） -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+</head>
+
+<body>
+<div class="wrap">
+  <header>
+    <div class="group">
+      <label>姓名
+        <input id="name" placeholder="张三" />
+      </label>
+      <label>公司/组织
+        <input id="org" placeholder="Steel Press" />
+      </label>
+      <label>职位
+        <input id="title" placeholder="Analyst" />
+      </label>
+      <label>电话
+        <input id="tel" placeholder="+49 ..." />
+      </label>
+      <label>邮箱
+        <input id="email" placeholder="name@example.com" />
+      </label>
+      <label>网址
+        <input id="url" placeholder="https://..." />
+      </label>
+    </div>
+
+    <div class="row" style="margin-top:10px;">
+      <label>背景图（相册/拍照）
+        <input id="bgFile" type="file" accept="image/*" capture="environment" />
+      </label>
+      <label>Logo（PNG透明更佳）
+        <input id="logoFile" type="file" accept="image/*" />
+      </label>
+
+      <button id="regen" class="primary">生成/刷新</button>
+      <button id="lock">锁定位置：开</button>
+      <button id="export">导出图片</button>
+    </div>
+  </header>
+
+  <main>
+    <canvas id="c"></canvas>
+    <div class="hint">
+      手势：单指拖动二维码；双指缩放。<br/>
+      导出后：iPhone 可能需要在分享面板里“存储图像”。<br/>
+      PWA 安装：iOS 用 Safari “分享 → 添加到主屏幕”。（iOS 不会自动弹安装提示是正常的）
+    </div>
+  </main>
+</div>
+
+<script src="./app.js"></script>
+</body>
+</html>
