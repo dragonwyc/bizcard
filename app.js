@@ -266,6 +266,21 @@ function render() {
     const r = Math.floor(s * 0.08);
     roundRect(left - 10, top - 10, s + 20, s + 20, r + 8, "rgba(255,255,255,0.92)");
     ctx.drawImage(qrImg, left, top, s, s);
+
+    // ===== 叠加 Logo 到二维码中心（如果用户上传了 logo）=====
+    if (logoImg) {
+      const logoRatio = 0.22; // logo 占二维码宽度比例，可改 0.18~0.26
+      const logoSize = Math.floor(s * logoRatio);
+    
+      const lx = Math.floor(left + (s - logoSize) / 2);
+      const ly = Math.floor(top + (s - logoSize) / 2);
+    
+      // 先画白底（遮住二维码，提升可扫性）
+      roundRect(lx, ly, logoSize, logoSize, Math.floor(logoSize * 0.18), "white");
+    
+      // 再画 logo
+      ctx.drawImage(logoImg, lx, ly, logoSize, logoSize);
+    }
   }
 }
 
@@ -442,6 +457,15 @@ if (panel && togglePanelBtn) {
   panel.classList.add("collapsed");
 }
 
+// ===== 输入变化自动刷新（防抖）=====
+let regenTimer = null;
+["name","org","title","tel","email","url"].forEach(id=>{
+  const el = document.getElementById(id);
+  el?.addEventListener("input", ()=>{
+    clearTimeout(regenTimer);
+    regenTimer = setTimeout(regenerate, 250);
+  });
+});
 // ===== 画布初始化 & 适配 iOS Safari =====
 window.addEventListener("resize", resizeCanvas);
 
