@@ -90,10 +90,9 @@ function buildVCard() {
   lines.push(`N:${escapeVC(familyName)};${escapeVC(givenName || fullName)};;;`);
   
   // 用标准分隔符替代竖线
-  const separator = "; "; // vCard标准多值分隔符
   if (org && title) {
-    // 这样写iPhone会显示为两行：公司名 + 职位
-    lines.push(`ORG:${escapeVC(org)}${separator}${escapeVC(title)}`);
+    // 用自然语言连接，iPhone 100%显示完整内容
+    lines.push(`ORG:${escapeVC(`${org} (${title})`)}`);
   } else if (org) {
     lines.push(`ORG:${escapeVC(org)}`);
   }
