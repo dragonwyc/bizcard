@@ -38,33 +38,99 @@ function fileToImage(file) {
   });
 }
 
-// --- 生成 vCard 文本 ---
 function buildVCard() {
-  const name = $("name").value.trim();
-  const org  = $("org").value.trim();
-  const title= $("title").value.trim();
-  const tel  = $("tel").value.trim();
-  const email= $("email").value.trim();
-  const url  = $("url").value.trim();
+  // 基本
+  const fullName = $("name").value.trim();      // 显示名
+  const org      = $("org").value.trim();       // 公司/组织
+  const title    = $("title").value.trim();     // 职位
+  const dept     = ($("dept")?.value || "").trim(); // 部门（可选：如果你加了输入框）
+  const note     = ($("note")?.value || "").trim(); // 备注（可选）
 
-  // 最小可用 vCard 3.0
-  // N: 姓;名;;; 这里简单拆分：把整串塞到名字段
-  const lines = [
-    "BEGIN:VCARD",
-    "VERSION:3.0",
-    `FN:${escapeVC(name)}`,
-    `N:;${escapeVC(name)};;;`
-  ];
-  if (org)   lines.push(`ORG:${escapeVC(org)}`);
+  // 联系方式（你可以在 UI 里加更多输入框：work/home/cell）
+  const telCell  = ($("tel")?.value || "").trim();      // 手机
+  const telWork  = ($("telWork")?.value || "").trim();  // 工作电话（可选）
+  const telHome  = ($("telHome")?.value || "").trim();  // 家庭电话（可选）
+
+  const email    = $("email").value.trim();
+  const emailWork= ($("emailWork")?.value || "").trim(); // 可选
+  const url      = $("url").value.trim();
+
+  // 地址（可选：按 vCard 3.0 ADR 顺序：POBOX;EXT;STREET;LOCALITY;REGION;POSTAL;COUNTRY）
+  const street   = ($("street")?.value || "").trim();
+  const city     = ($("city")?.value || "").trim();
+  const region   = ($("region")?.value || "").trim();   // 州/省
+  const postal   = ($("postal")?.value || "").trim();
+  const country  = ($("country")?.value || "").trim();
+
+  // 社交/IM（可选）
+  const imWechat = ($("wechat")?.value || "").trim();
+  const imTelegram = ($("telegram")?.value || "").trim();
+
+  // 把“结构化姓名 N”尽量填好：姓;名;中间名;前缀;后缀
+  // 你现在只有一个“姓名”输入框：最稳的做法是把它放到“名”字段里，姓留空（兼容性仍很好）
+  const nFamily = "";              // 如果你愿意，也可以加“姓/名”两个输入框
+  const nGiven  = fullName || "";
+
+  const lines = [];
+  lines.push("BEGIN:VCARD");
+  lines.push("VERSION:3.0");
+
+  // 必备
+  if (fullName) {
+    lines.push(`FN:${escapeVC(fullName)}`);
+    lines.push(`N:${escapeVC(nFamily)};${escapeVC(nGiven)};;;`);
+  } else {
+    // 没有姓名也给个最小兜底，避免有的扫码器不认
+    lines.push("FN: ");
+    lines.push("N:;;;;");
+  }
+
+  // 组织信息
+  if (org && dept) {
+    // ORG 可以包含公司;部门
+    lines.push(`ORG:${escapeVC(org)};${escapeVC(dept)}`);
+  } else if (org) {
+    lines.push(`ORG:${escapeVC(org)}`);
+  }
   if (title) lines.push(`TITLE:${escapeVC(title)}`);
-  if (tel)   lines.push(`TEL;TYPE=CELL:${escapeVC(tel)}`);
-  if (email) lines.push(`EMAIL;TYPE=INTERNET:${escapeVC(email)}`);
-  if (url)   lines.push(`URL:${escapeVC(url)}`);
+
+  // 电话
+  if (telCell) lines.push(`TEL;TYPE=CELL:${escapeVC(telCell)}`);
+  if (telWork) lines.push(`TEL;TYPE=WORK,VOICE:${escapeVC(telWork)}`);
+  if (telHome) lines.push(`TEL;TYPE=HOME,VOICE:${escapeVC(telHome)}`);
+
+  // 邮箱
+  if (email)     lines.push(`EMAIL;TYPE=INTERNET:${escapeVC(email)}`);
+  if (emailWork) lines.push(`EMAIL;TYPE=WORK,INTERNET:${escapeVC(emailWork)}`);
+
+  // 网站
+  if (url) lines.push(`URL:${escapeVC(url)}`);
+
+  // 地址
+  if (street || city || region || postal || country) {
+    const adr = `ADR;TYPE=WORK:;;${escapeVC(street)};${escapeVC(city)};${escapeVC(region)};${escapeVC(postal)};${escapeVC(country)}`;
+    lines.push(adr);
+  }
+
+  // IM / 社交（不同系统支持不完全统一，但加了也无害）
+  // iOS/Android 对 IMPP 支持一般；NOTE/URL/TEL/EMAIL/ADR 更关键
+  if (imTelegram) lines.push(`IMPP:telegram:${escapeVC(imTelegram)}`);
+  if (imWechat)   lines.push(`NOTE:${escapeVC(note ? (note + " | WeChat: " + imWechat) : ("WeChat: " + imWechat))}`);
+  else if (note)  lines.push(`NOTE:${escapeVC(note)}`);
+
   lines.push("END:VCARD");
-  return lines.join("\n");
+
+  // 关键：用 CRLF
+  return lines.join("\r\n");
 }
+
+// vCard 转义：\n ; , \ 都需要处理
 function escapeVC(s) {
-  return s.replace(/\\/g,"\\\\").replace(/\n/g,"\\n").replace(/;/g,"\\;").replace(/,/g,"\\,");
+  return String(s)
+    .replace(/\\/g, "\\\\")
+    .replace(/\r?\n/g, "\\n")
+    .replace(/;/g, "\\;")
+    .replace(/,/g, "\\,");
 }
 
 // --- 生成二维码图（带 logo 挖空叠加） ---
@@ -120,27 +186,31 @@ function drawTextOverlay(cw, ch) {
   const org = $("org").value.trim();
   const name = $("name").value.trim();
 
-  const pad = Math.round(Math.min(cw, ch) * 0.04);
-  const yTop = pad;
+  const pad = Math.round(Math.min(cw, ch) * 0.05);
+  const top = pad;
 
   ctx.save();
   ctx.shadowColor = "rgba(0,0,0,0.35)";
-  ctx.shadowBlur = 8;
+  ctx.shadowBlur = 10;
 
-  // 公司
+  // 公司（更大）
   if (org) {
-    ctx.font = `700 ${Math.round(ch * 0.05)}px -apple-system,BlinkMacSystemFont,Segoe UI,Roboto`;
+    ctx.font = `800 ${Math.round(ch * 0.055)}px -apple-system,BlinkMacSystemFont,Segoe UI,Roboto`;
     ctx.fillStyle = "white";
-    ctx.fillText(org, pad, yTop + Math.round(ch * 0.06));
+    ctx.fillText(org, pad, top + Math.round(ch * 0.06));
   }
 
   // 姓名
   if (name) {
-    ctx.font = `600 ${Math.round(ch * 0.045)}px -apple-system,BlinkMacSystemFont,Segoe UI,Roboto`;
+    ctx.font = `700 ${Math.round(ch * 0.048)}px -apple-system,BlinkMacSystemFont,Segoe UI,Roboto`;
     ctx.fillStyle = "white";
-    const y = yTop + Math.round(ch * 0.12);
-    ctx.fillText(name, pad, y);
+    ctx.fillText(name, pad, top + Math.round(ch * 0.12));
   }
+
+  // BUSINESS CARD（小字，作为标识）
+  ctx.font = `700 ${Math.round(ch * 0.028)}px -apple-system,BlinkMacSystemFont,Segoe UI,Roboto`;
+  ctx.fillStyle = "rgba(255,255,255,0.92)";
+  ctx.fillText("BUSINESS CARD", pad, top + Math.round(ch * 0.165));
 
   ctx.restore();
 }
