@@ -134,40 +134,51 @@ function escapeVC(s) {
 }
 
 // --- 生成二维码图（带 logo 挖空叠加） ---
-async function generateQRImage(vcardText) {
-  // 先生成纯二维码到离屏 canvas
-  const size = 1024; // 输出清晰度
-  const off = document.createElement("canvas");
-  off.width = off.height = size;
-  await QRCode.toCanvas(off, vcardText, {
-    errorCorrectionLevel: "H",
-    margin: 2,
-    color: { dark: "#000000", light: "#ffffff" }
-  });
-
-  const octx = off.getContext("2d");
-
-  // 叠加 logo（你 Python 的思路：中间挖白再贴）
-  if (logoImg) {
-    const logoRatio = 0.16; // 安全值
-    const logoH = Math.floor(size * logoRatio);
-    const logoW = Math.floor(logoH * (375 / 140)); // 保持你原先的宽高比
-
-    const left = Math.floor((size - logoW) / 2);
-    const top  = Math.floor((size - logoH) / 2);
-
-    // 挖空
-    octx.fillStyle = "#ffffff";
-    octx.fillRect(left, top, logoW, logoH);
-
-    // 画 logo（按透明通道）
-    octx.drawImage(logoImg, left, top, logoW, logoH);
+// 用 qrcodejs 生成二维码，并返回一个 Image（与你现有贴 logo 的流程兼容）
+async function generateQRImage(text) {
+  if (!window.QRCode) {
+    alert("二维码库未加载：window.QRCode 不存在。请检查 qrcode.min.js 是否成功引入。");
+    throw new Error("QRCode (qrcodejs) not loaded");
   }
 
-  // 转成 Image 方便主画布 drawImage
+  // 生成到一个隐藏容器里
+  const tmp = document.createElement("div");
+  tmp.style.position = "fixed";
+  tmp.style.left = "-99999px";
+  tmp.style.top = "-99999px";
+  document.body.appendChild(tmp);
+
+  // 清空旧内容
+  tmp.innerHTML = "";
+
+  // 你之前用的是高纠错 H，这里保持一致
+  const qr = new QRCode(tmp, {
+    text,
+    width: 512,
+    height: 512,
+    correctLevel: QRCode.CorrectLevel.H,
+  });
+
+  // qrcodejs 是同步绘制，但保险起见等一帧
+  await new Promise((r) => requestAnimationFrame(r));
+
+  const canvas = tmp.querySelector("canvas");
+  if (!canvas) {
+    document.body.removeChild(tmp);
+    throw new Error("qrcodejs did not render a canvas");
+  }
+
+  const dataUrl = canvas.toDataURL("image/png");
+
+  document.body.removeChild(tmp);
+
+  // 转成 Image，方便你后面贴到主 canvas
   const img = new Image();
-  img.src = off.toDataURL("image/png");
-  await img.decode();
+  img.src = dataUrl;
+  await new Promise((resolve, reject) => {
+    img.onload = resolve;
+    img.onerror = reject;
+  });
   return img;
 }
 
