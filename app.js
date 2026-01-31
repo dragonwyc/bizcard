@@ -89,10 +89,11 @@ function buildVCard() {
   // N:Family;Given;;;  （如果没填姓/名，就放空）
   lines.push(`N:${escapeVC(familyName)};${escapeVC(givenName || fullName)};;;`);
   
-  // ORG / TITLE（保持简单）
-  // ORG（把职务合并进去，iPhone 更稳）
+  // 用标准分隔符替代竖线
+  const separator = "; "; // vCard标准多值分隔符
   if (org && title) {
-    lines.push(`ORG:${escapeVC(org + " · " + title)}`);
+    // 这样写iPhone会显示为两行：公司名 + 职位
+    lines.push(`ORG:${escapeVC(org)}${separator}${escapeVC(title)}`);
   } else if (org) {
     lines.push(`ORG:${escapeVC(org)}`);
   }
