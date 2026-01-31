@@ -78,7 +78,7 @@ function buildVCard() {
   
   // FN / N（按你示例：Zhang San + Zhang;San）
   // ===== FN / N（按示例：FN 显示名；N 结构化 姓;名）=====
-  const displayName = fullName || [familyName, givenName].filter(Boolean).join(" ") || "";
+  const displayName = fullName || [familyName, givenName].filter(Boolean).join(" ") || org || "";
   
   if (displayName) {
     lines.push(`FN:${escapeVC(displayName)}`);
@@ -87,11 +87,11 @@ function buildVCard() {
   }
   
   // N:Family;Given;;;  （如果没填姓/名，就放空）
-  lines.push(`N:${escapeVC(familyName)};${escapeVC(givenName)};;;`);
+  lines.push(`N:${escapeVC(familyName)};${escapeVC(givenName || fullName)};;;`);
   
   // ORG / TITLE（保持简单）
   if (org)   lines.push(`ORG:${escapeVC(org)}`);
-  if (title) lines.push(`TITLE:${escapeVC(title)}`);
+  if (title) lines.push(`TITLE;TYPE=WORK:${escapeVC(title)}`);
   
   // TEL / EMAIL（保持简单）
   if (telCell) lines.push(`TEL;TYPE=CELL:${escapeVC(telCell)}`);
