@@ -68,59 +68,50 @@ function buildVCard() {
 
   // 把“结构化姓名 N”尽量填好：姓;名;中间名;前缀;后缀
   // 你现在只有一个“姓名”输入框：最稳的做法是把它放到“名”字段里，姓留空（兼容性仍很好）
-  const nFamily = "";              // 如果你愿意，也可以加“姓/名”两个输入框
-  const nGiven  = fullName || "";
+  const familyName = ($("familyName")?.value || "").trim();
+  const givenName  = ($("givenName")?.value || "").trim();
 
+  // ===== 生成 vCard（按你提供的可扫格式）=====
   const lines = [];
   lines.push("BEGIN:VCARD");
   lines.push("VERSION:3.0");
-
-  // 必备
-  if (fullName) {
-    lines.push(`FN:${escapeVC(fullName)}`);
-    lines.push(`N:${escapeVC(nFamily)};${escapeVC(nGiven)};;;`);
+  
+  // FN / N（按你示例：Zhang San + Zhang;San）
+  // ===== FN / N（按示例：FN 显示名；N 结构化 姓;名）=====
+  const displayName = fullName || [familyName, givenName].filter(Boolean).join(" ") || "";
+  
+  if (displayName) {
+    lines.push(`FN:${escapeVC(displayName)}`);
   } else {
-    // 没有姓名也给个最小兜底，避免有的扫码器不认
-    lines.push("FN: ");
-    lines.push("N:;;;;");
+    lines.push("FN:");
   }
-
-  // 组织信息
-  if (org && dept) {
-    // ORG 可以包含公司;部门
-    lines.push(`ORG:${escapeVC(org)};${escapeVC(dept)}`);
-  } else if (org) {
-    lines.push(`ORG:${escapeVC(org)}`);
-  }
+  
+  // N:Family;Given;;;  （如果没填姓/名，就放空）
+  lines.push(`N:${escapeVC(familyName)};${escapeVC(givenName)};;;`);
+  
+  // ORG / TITLE（保持简单）
+  if (org)   lines.push(`ORG:${escapeVC(org)}`);
   if (title) lines.push(`TITLE:${escapeVC(title)}`);
-
-  // 电话
+  
+  // TEL / EMAIL（保持简单）
   if (telCell) lines.push(`TEL;TYPE=CELL:${escapeVC(telCell)}`);
-  if (telWork) lines.push(`TEL;TYPE=WORK,VOICE:${escapeVC(telWork)}`);
-  if (telHome) lines.push(`TEL;TYPE=HOME,VOICE:${escapeVC(telHome)}`);
-
-  // 邮箱
-  if (email)     lines.push(`EMAIL;TYPE=INTERNET:${escapeVC(email)}`);
-  if (emailWork) lines.push(`EMAIL;TYPE=WORK,INTERNET:${escapeVC(emailWork)}`);
-
-  // 网站
-  if (url) lines.push(`URL:${escapeVC(url)}`);
-
-  // 地址
-  if (street || city || region || postal || country) {
-    const adr = `ADR;TYPE=WORK:;;${escapeVC(street)};${escapeVC(city)};${escapeVC(region)};${escapeVC(postal)};${escapeVC(country)}`;
-    lines.push(adr);
+  if (email)   lines.push(`EMAIL:${escapeVC(email)}`);
+  
+  // ADR（按你示例的“宽松写法”输出：ADR:;;street;;postal;city）
+  if (street || postal || city) {
+    lines.push(`ADR:;;${escapeVC(street)};;${escapeVC(postal)};${escapeVC(city)}`);
   }
-
-  // IM / 社交（不同系统支持不完全统一，但加了也无害）
-  // iOS/Android 对 IMPP 支持一般；NOTE/URL/TEL/EMAIL/ADR 更关键
-  if (imTelegram) lines.push(`IMPP:telegram:${escapeVC(imTelegram)}`);
-  if (imWechat)   lines.push(`NOTE:${escapeVC(note ? (note + " | WeChat: " + imWechat) : ("WeChat: " + imWechat))}`);
-  else if (note)  lines.push(`NOTE:${escapeVC(note)}`);
-
+  
+  // URL / NOTE
+  if (url)  lines.push(`URL:${escapeVC(url)}`);
+  
+  // NOTE：把 wechat/telegram 也塞进 NOTE（别用 IMPP，避免扫码器丢字段）
+  let noteAll = note || "";
+  if (imWechat) noteAll = noteAll ? `${noteAll} | WeChat: ${imWechat}` : `WeChat: ${imWechat}`;
+  if (imTelegram) noteAll = noteAll ? `${noteAll} | Telegram: ${imTelegram}` : `Telegram: ${imTelegram}`;
+  if (noteAll) lines.push(`NOTE:${escapeVC(noteAll)}`);
+  
   lines.push("END:VCARD");
-
-  // 关键：用 CRLF
   return lines.join("\r\n");
 }
 
@@ -459,7 +450,7 @@ if (panel && togglePanelBtn) {
 
 // ===== 输入变化自动刷新（防抖）=====
 let regenTimer = null;
-["name","org","title","tel","email","url"].forEach(id=>{
+["name","familyName","givenName","org","title","tel","email","url"].forEach(id=>{
   const el = document.getElementById(id);
   el?.addEventListener("input", ()=>{
     clearTimeout(regenTimer);
