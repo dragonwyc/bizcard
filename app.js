@@ -414,10 +414,30 @@ $("export").addEventListener("click", async () => {
   alert("已下载图片。iPhone 若未保存到相册，可在文件/分享里选择“存储图像”。");
 });
 
-// 初始渲染
+// ===== 编辑面板 折叠 / 展开 =====
+const panel = document.getElementById("panel");
+const togglePanelBtn = document.getElementById("togglePanel");
+
+if (panel && togglePanelBtn) {
+  togglePanelBtn.addEventListener("click", () => {
+    panel.classList.toggle("collapsed");
+
+    // 折叠 / 展开后，画布高度会变化
+    resizeCanvas();
+    setTimeout(resizeCanvas, 200);
+  });
+
+  // 页面首次进入：默认折叠（预览优先）
+  panel.classList.add("collapsed");
+}
+
+// ===== 画布初始化 & 适配 iOS Safari =====
 window.addEventListener("resize", resizeCanvas);
+
+// 立即算一次
 resizeCanvas();
 regenerate();
-// iOS Safari 会在地址栏收起/展开后才稳定
-// 延迟再算一次，防止高度偏小
+
+// iOS Safari 地址栏/工具栏会在 0~300ms 内变化
+// 延迟再算一次，防止画布高度偏小
 setTimeout(resizeCanvas, 300);
