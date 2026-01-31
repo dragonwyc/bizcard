@@ -165,6 +165,14 @@
         padding-right: 18px;
       }
     }
+    /* 折叠编辑面板：只留一行按钮 */
+    header.collapsed .form-grid,
+    header.collapsed .file {
+      display: none !important;
+    }
+    header.collapsed {
+      padding-bottom: 10px;
+    }
   </style>
 
   <!-- 二维码库（纯前端） -->
@@ -173,7 +181,7 @@
 
 <body>
 <div class="wrap">
-  <header>
+  <header id="panel">
     <div class="form-grid">
       <label>姓名
         <input id="name" placeholder="张三" />
@@ -197,7 +205,7 @@
 
   <div class="row">
     <label class="file">背景图（相册/拍照）
-      <input id="bgFile" type="file" accept="image/*" capture="environment" />
+      <input id="bgFile" type="file" accept="image/*" />
     </label>
   
     <label class="file">Logo（PNG透明更佳）
@@ -208,6 +216,7 @@
       <button id="regen" class="primary">生成/刷新</button>
       <button id="lock">锁定位置：开</button>
       <button id="export">导出图片</button>
+      <button id="togglePanel">编辑信息</button>
     </div>
   </div>
   </header>
