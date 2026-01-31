@@ -39,6 +39,10 @@ function fileToImage(file) {
 }
 
 function buildVCard() {
+  const lines = [];
+  lines.push("BEGIN:VCARD");
+  lines.push("VERSION:3.0");
+  lines.push("CHARSET=UTF-8"); 
   // 基本
   const fullName = $("name").value.trim();      // 显示名
   const org      = $("org").value.trim();       // 公司/组织
@@ -80,34 +84,30 @@ function buildVCard() {
   // ===== FN / N（按示例：FN 显示名；N 结构化 姓;名）=====
   const displayName = fullName || [familyName, givenName].filter(Boolean).join(" ") || org || "";
   
+  // 修改 FN 字段
   if (displayName) {
-    lines.push(`FN:${escapeVC(displayName)}`);
+    lines.push(`FN;CHARSET=UTF-8:${escapeVC(displayName)}`); // 👈 关键修复2
   } else {
-    lines.push("FN:");
+    lines.push("FN;CHARSET=UTF-8:");
   }
   
-  // N:Family;Given;;;  （如果没填姓/名，就放空）
-  lines.push(`N:${escapeVC(familyName)};${escapeVC(givenName || fullName)};;;`);
+  // 修改 N 字段
+  lines.push(`N;CHARSET=UTF-8:${escapeVC(familyName)};${escapeVC(givenName || fullName)};;;`);
   
-  // 用标准分隔符替代竖线
+  // 修改 ORG 字段
   if (org && title) {
-    // 用自然语言连接，iPhone 100%显示完整内容
-    lines.push(`ORG:${escapeVC(`${org} (${title})`)}`);
+    lines.push(`ORG;CHARSET=UTF-8:${escapeVC(`${org} (${title})`)}`);
   } else if (org) {
-    lines.push(`ORG:${escapeVC(org)}`);
+    lines.push(`ORG;CHARSET=UTF-8:${escapeVC(org)}`);
   }
   
-  // TEL / EMAIL（保持简单）
-  if (telCell) lines.push(`TEL;TYPE=CELL:${escapeVC(telCell)}`);
-  if (email)   lines.push(`EMAIL:${escapeVC(email)}`);
-  
-  // ADR（按你示例的“宽松写法”输出：ADR:;;street;;postal;city）
+  // 修改 ADR 字段
   if (street || postal || city) {
-    lines.push(`ADR:;;${escapeVC(street)};;${escapeVC(postal)};${escapeVC(city)}`);
+    lines.push(`ADR;CHARSET=UTF-8:;;${escapeVC(street)};;${escapeVC(postal)};${escapeVC(city)}`);
   }
   
-  // URL / NOTE
-  if (url)  lines.push(`URL:${escapeVC(url)}`);
+  // 修改 NOTE 字段
+  if (noteAll) lines.push(`NOTE;CHARSET=UTF-8:${escapeVC(noteAll)}`);
   
   // NOTE：把 wechat/telegram 也塞进 NOTE（别用 IMPP，避免扫码器丢字段）
   let noteAll = note || "";
@@ -125,7 +125,11 @@ function escapeVC(s) {
     .replace(/\\/g, "\\\\")
     .replace(/\r?\n/g, "\\n")
     .replace(/;/g, "\\;")
-    .replace(/,/g, "\\,");
+    .replace(/,/g, "\\,")
+    // 确保Unicode字符正确编码
+    .replace(/[\u0080-\uFFFF]/g, c => 
+      `\\u${('000' + c.charCodeAt(0).toString(16)).slice(-4)}`
+    );
 }
 
 // --- 生成二维码图（带 logo 挖空叠加） ---
