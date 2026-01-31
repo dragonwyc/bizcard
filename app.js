@@ -90,8 +90,12 @@ function buildVCard() {
   lines.push(`N:${escapeVC(familyName)};${escapeVC(givenName || fullName)};;;`);
   
   // ORG / TITLE（保持简单）
-  if (org)   lines.push(`ORG:${escapeVC(org)}`);
-  if (title) lines.push(`TITLE;TYPE=WORK:${escapeVC(title)}`);
+  // ORG（把职务合并进去，iPhone 更稳）
+  if (org && title) {
+    lines.push(`ORG:${escapeVC(org + " · " + title)}`);
+  } else if (org) {
+    lines.push(`ORG:${escapeVC(org)}`);
+  }
   
   // TEL / EMAIL（保持简单）
   if (telCell) lines.push(`TEL;TYPE=CELL:${escapeVC(telCell)}`);
