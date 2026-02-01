@@ -118,33 +118,27 @@ function utf8ToBinaryString(str) {
 }
 
 // 用 qrcodejs 生成二维码，并返回一个 Image（与你现有贴 logo 的流程兼容）
-// --- 生成二维码图（UTF-8 兼容，支持中文 vCard） ---
+// --- 生成二维码图（使用 qrcodejs + UTF-8 补丁，支持中文） ---
 async function generateQRImage(text) {
   if (!window.QRCode) {
     alert("二维码库未加载：window.QRCode 不存在。请检查 qrcode.min.js 是否成功引入。");
     throw new Error("QRCode (qrcodejs) not loaded");
   }
 
-  // ⚠️ 关键：把 vCard 转成 UTF-8 字节串，避免中文失效
-  const utf8Text = utf8ToBinaryString(text);
-
-  // 生成到一个隐藏容器里
   const tmp = document.createElement("div");
   tmp.style.position = "fixed";
   tmp.style.left = "-99999px";
   tmp.style.top = "-99999px";
   document.body.appendChild(tmp);
-
   tmp.innerHTML = "";
 
   const qr = new QRCode(tmp, {
-    text: utf8Text,                 // 👈 关键修改点
+    text: text,                 // ✅ 直接用原始 vCard 字符串
     width: 768,
     height: 768,
     correctLevel: QRCode.CorrectLevel.H,
   });
 
-  // 等一帧，确保 canvas 渲染完成
   await new Promise(r => requestAnimationFrame(r));
 
   const canvas = tmp.querySelector("canvas");
@@ -165,7 +159,6 @@ async function generateQRImage(text) {
 
   return img;
 }
-
 // --- 画背景 cover（全屏裁切）---
 function drawCover(img, cw, ch) {
   const iw = img.width, ih = img.height;
