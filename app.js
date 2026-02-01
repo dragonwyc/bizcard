@@ -86,62 +86,109 @@ function fileToImage(file) {
   });
 }
 
+function qpEncodeUtf8(str) {
+  const bytes = new TextEncoder().encode(String(str ?? ""));
+  let out = "";
+  for (const b of bytes) {
+    // 可见 ASCII（不含 '='）和空格原样输出
+    if ((b >= 0x21 && b <= 0x7E && b !== 0x3D) || b === 0x20) {
+      out += String.fromCharCode(b);
+    } else {
+      out += "=" + b.toString(16).toUpperCase().padStart(2, "0");
+    }
+  }
+  return out;
+}
+
+function foldVCardLine(line, limit = 70) {
+  if (line.length <= limit) return line;
+  let out = "";
+  let i = 0;
+  while (i < line.length) {
+    const chunk = line.slice(i, i + limit);
+    i += limit;
+    if (i < line.length) out += chunk + "=\r\n ";
+    else out += chunk;
+  }
+  return out;
+}
+
 function buildVCard() {
-  // 基本
-  const fullName = $("name").value.trim();
-  const org      = $("org").value.trim();
-  const title    = $("title").value.trim();
+  const fullName = ($("name")?.value || "").trim();
+  const org      = ($("org")?.value || "").trim();
+  const title    = ($("title")?.value || "").trim();
   const note     = ($("note")?.value || "").trim();
 
-  // 电话 / 邮件 / URL
   const telCell  = ($("tel")?.value || "").trim();
-  const email    = $("email").value.trim();
-  const url      = $("url").value.trim();
+  const email    = ($("email")?.value || "").trim();
+  const url      = ($("url")?.value || "").trim();
 
-  // 地址
   const street   = ($("street")?.value || "").trim();
   const city     = ($("city")?.value || "").trim();
   const postal   = ($("postal")?.value || "").trim();
   const country  = ($("country")?.value || "").trim();
 
-  // IM
   const imWechat   = ($("wechat")?.value || "").trim();
   const imTelegram = ($("telegram")?.value || "").trim();
 
-  // 结构化姓名
   const familyName = ($("familyName")?.value || "").trim();
   const givenName  = ($("givenName")?.value || "").trim();
 
-  // NOTE 合并（先拼好再写入）
-  let noteAll = note || "";
-  if (imWechat)   noteAll = noteAll ? `${noteAll} | WeChat: ${imWechat}` : `WeChat: ${imWechat}`;
+  // iOS 更稳：FN 一定要有
+  const displayName =
+    fullName || [familyName, givenName].filter(Boolean).join(" ") || org || " ";
+
+  // NOTE：为了 iOS 不丢公司/职务，把它们也放进 NOTE 第一段（字段展示不稳定时有救）
+  let noteAll = "";
+  if (org || title) noteAll = `${org}${org && title ? " / " : ""}${title}`.trim();
+  if (note) noteAll = noteAll ? `${noteAll} | ${note}` : note;
+  if (imWechat) noteAll = noteAll ? `${noteAll} | WeChat: ${imWechat}` : `WeChat: ${imWechat}`;
   if (imTelegram) noteAll = noteAll ? `${noteAll} | Telegram: ${imTelegram}` : `Telegram: ${imTelegram}`;
 
-  // 生成 vCard
+  const nFamily = familyName || "";
+  const nGiven  = givenName || (fullName || "");
+
   const lines = [];
   lines.push("BEGIN:VCARD");
-  lines.push("VERSION:3.0");
+  lines.push("VERSION:2.1");
 
-  const displayName = fullName || [familyName, givenName].filter(Boolean).join(" ") || org || "";
-  lines.push(`FN;CHARSET=UTF-8:${escapeVC(displayName)}`);
-  lines.push(`N;CHARSET=UTF-8:${escapeVC(familyName)};${escapeVC(givenName || fullName)};;;`);
+  // iOS 通讯录偏好的一些扩展（可选但建议）
+  lines.push("X-ABShowAs:COMPANY");
+
+  lines.push(foldVCardLine(
+    `FN;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${qpEncodeUtf8(displayName)}`
+  ));
+
+  lines.push(foldVCardLine(
+    `N;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${qpEncodeUtf8(nFamily)};${qpEncodeUtf8(nGiven)};;;`
+  ));
 
   if (org) {
-    // 你原来 ORG 想带 title，我保留这个逻辑
-    lines.push(`ORG;CHARSET=UTF-8:${escapeVC(title ? `${org} (${title})` : org)}`);
+    lines.push(foldVCardLine(
+      `ORG;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${qpEncodeUtf8(org)}`
+    ));
   }
-  if (title) lines.push(`TITLE;CHARSET=UTF-8:${escapeVC(title)}`);
+  if (title) {
+    lines.push(foldVCardLine(
+      `TITLE;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${qpEncodeUtf8(title)}`
+    ));
+  }
 
-  if (telCell) lines.push(`TEL;TYPE=CELL:${escapeVC(telCell)}`);
-  if (email)   lines.push(`EMAIL:${escapeVC(email)}`);
-  if (url)     lines.push(`URL:${escapeVC(url)}`);
+  if (telCell) lines.push(`TEL;CELL:${telCell}`);
+  if (email)   lines.push(`EMAIL:${email}`);
+  if (url)     lines.push(`URL:${url}`);
 
-  // ADR 顺序：;;street;city;;postal;country
   if (street || city || postal || country) {
-    lines.push(`ADR;CHARSET=UTF-8:;;${escapeVC(street)};${escapeVC(city)};;${escapeVC(postal)};${escapeVC(country)}`);
+    const adr =
+      `ADR;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:;;${qpEncodeUtf8(street)};${qpEncodeUtf8(city)};;${qpEncodeUtf8(postal)};${qpEncodeUtf8(country)}`;
+    lines.push(foldVCardLine(adr));
   }
 
-  if (noteAll) lines.push(`NOTE;CHARSET=UTF-8:${escapeVC(noteAll)}`);
+  if (noteAll) {
+    lines.push(foldVCardLine(
+      `NOTE;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${qpEncodeUtf8(noteAll)}`
+    ));
+  }
 
   lines.push("END:VCARD");
   return lines.join("\r\n");
