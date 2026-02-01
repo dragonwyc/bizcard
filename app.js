@@ -62,6 +62,17 @@ let logoImg = null;
 let qrImg = null; // 用 Image 存放生成后的二维码图
 let textBBox = null;
 
+let textBBox = null;
+let qrBBox = null;
+
+let pinchTarget = null;     // "qr" | "text"
+let longPressTimer = null;
+let pressStart = null;      // {x,y}
+let movedTooMuch = false;
+
+const LONG_PRESS_MS = 200;
+const MOVE_THRESH_PX = 12;  // 超过这个就认为不是长按
+
 // 二维码可拖拽缩放参数（以 canvas 像素为单位）
 let qrState = {
   x: 0.75,   // 相对位置（0~1）
@@ -364,6 +375,8 @@ function resizeCanvas() {
 function render() {
   const cw = canvas.width, ch = canvas.height;
   ctx.clearRect(0, 0, cw, ch);
+  qrBBox = null;
+  textBBox = null;
 
   // 背景
   if (bgImg) {
@@ -392,6 +405,9 @@ function render() {
     const r = Math.floor(s * 0.08);
     roundRect(left - 14, top - 14, s + 28, s + 28, r + 10, "#ffffff");
     ctx.drawImage(qrImg, left, top, s, s);
+
+    // 记录二维码 bbox（用于命中测试）
+    qrBBox = { left, top, right: left + s, bottom: top + s };
 
     // ===== 叠加 Logo 到二维码中心（如果用户上传了 logo）=====
     if (logoImg) {
@@ -470,21 +486,48 @@ function mid(a,b){ return { x:(a.x+b.x)/2, y:(a.y+b.y)/2 }; }
 canvas.addEventListener("touchstart", (ev) => {
   if (locked) return;
   ev.preventDefault();
+
   const ts = getTouches(ev);
+
+  // 清理上一次长按
+  clearLongPress();
+
   if (ts.length === 1) {
     const t = ts[0];
-    // 先判断点到文字还是二维码：点中文字 → 拖文字，否则拖二维码
-    pointerMode = hitBBox(t, textBBox) ? "dragText" : "dragQR";
     lastTouch = t;
+
+    // 默认先按“当前点到谁就拖谁”
+    pointerMode = hitBBox(t, textBBox) ? "dragText" : "dragQR";
+
+    // 长按吸附：0.2s 后根据“最近目标”锁定拖拽对象（不用点很准）
+    pressStart = { x: t.x, y: t.y };
+    movedTooMuch = false;
+
+    longPressTimer = setTimeout(() => {
+      if (!lastTouch || movedTooMuch) return;
+      const target = pickNearestTarget(lastTouch);
+      pointerMode = (target === "text") ? "dragText" : "dragQR";
+      // 可选：长按后立即 render 一下（让你感觉“选中”生效）
+      render();
+    }, LONG_PRESS_MS);
+
   } else if (ts.length >= 2) {
+    // 双指：决定缩放谁（中点落在哪个 bbox / 或最近目标）
     pointerMode = "pinch";
     const a = ts[0], b = ts[1];
+    const m = mid(a, b);
+
+    pinchTarget = hitBBox(m, textBBox) ? "text"
+                : hitBBox(m, qrBBox)   ? "qr"
+                : pickNearestTarget(m);
+
     pinchStart = {
-      d: dist(a,b),
-      m: mid(a,b),
-      scale: qrState.scale,
-      x: qrState.x,
-      y: qrState.y
+      d: dist(a, b),
+      m,
+      target: pinchTarget,
+      // 记录起始状态
+      qr:  { scale: qrState.scale, x: qrState.x, y: qrState.y },
+      text:{ scale: textState.scale, x: textState.x, y: textState.y }
     };
   }
 }, { passive:false });
@@ -492,9 +535,22 @@ canvas.addEventListener("touchstart", (ev) => {
 canvas.addEventListener("touchmove", (ev) => {
   if (locked) return;
   ev.preventDefault();
+
   const ts = getTouches(ev);
   const cw = canvas.width, ch = canvas.height;
 
+  // 判断是否移动过多（会取消长按）
+  if (ts.length === 1 && pressStart && lastTouch) {
+    const t = ts[0];
+    const dx0 = t.x - pressStart.x;
+    const dy0 = t.y - pressStart.y;
+    if (Math.hypot(dx0, dy0) > MOVE_THRESH_PX) movedTooMuch = true;
+    if (movedTooMuch) clearLongPress();
+  } else {
+    clearLongPress();
+  }
+
+  // 单指拖动
   if ((pointerMode === "dragQR" || pointerMode === "dragText") && ts.length === 1 && lastTouch) {
     const t = ts[0];
     const dx = t.x - lastTouch.x;
@@ -510,21 +566,28 @@ canvas.addEventListener("touchmove", (ev) => {
 
     lastTouch = t;
     render();
+    return;
   }
 
+  // 双指缩放 + 中点移动（文字/二维码都支持）
   if (pointerMode === "pinch" && ts.length >= 2 && pinchStart) {
     const a = ts[0], b = ts[1];
-    const d = dist(a,b);
-    const m = mid(a,b);
+    const d = dist(a, b);
+    const m = mid(a, b);
 
     const scaleFactor = d / pinchStart.d;
-    qrState.scale = clamp(pinchStart.scale * scaleFactor, 0.5, 2.5);
-
-    // 同时允许用双指中点移动
     const dx = m.x - pinchStart.m.x;
     const dy = m.y - pinchStart.m.y;
-    qrState.x = clamp01(pinchStart.x + dx / cw);
-    qrState.y = clamp01(pinchStart.y + dy / ch);
+
+    if (pinchStart.target === "qr") {
+      qrState.scale = clamp(pinchStart.qr.scale * scaleFactor, 0.5, 2.5);
+      qrState.x = clamp01(pinchStart.qr.x + dx / cw);
+      qrState.y = clamp01(pinchStart.qr.y + dy / ch);
+    } else {
+      textState.scale = clamp(pinchStart.text.scale * scaleFactor, 0.6, 3.0);
+      textState.x = clamp01(pinchStart.text.x + dx / cw);
+      textState.y = clamp01(pinchStart.text.y + dy / ch);
+    }
 
     render();
   }
@@ -532,11 +595,14 @@ canvas.addEventListener("touchmove", (ev) => {
 
 canvas.addEventListener("touchend", (ev) => {
   if (locked) return;
+
   const ts = getTouches(ev);
   if (ts.length === 0) {
     pointerMode = null;
     lastTouch = null;
     pinchStart = null;
+    pinchTarget = null;
+    clearLongPress();
   }
 });
 
@@ -545,6 +611,49 @@ function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
 function hitBBox(p, box) {
   if (!box) return false;
   return p.x >= box.left && p.x <= box.right && p.y >= box.top && p.y <= box.bottom;
+}
+
+function hitBBox(p, box) {
+  if (!box) return false;
+  return p.x >= box.left && p.x <= box.right && p.y >= box.top && p.y <= box.bottom;
+}
+
+function bboxCenter(box) {
+  return { x: (box.left + box.right) / 2, y: (box.top + box.bottom) / 2 };
+}
+
+function dist2(a, b) {
+  const dx = a.x - b.x, dy = a.y - b.y;
+  return dx*dx + dy*dy;
+}
+
+function pickNearestTarget(p) {
+  // 优先：如果点进了某个 bbox，就直接选它
+  if (hitBBox(p, textBBox)) return "text";
+  if (hitBBox(p, qrBBox)) return "qr";
+
+  // 否则：选离中心更近的那个（实现“吸附选中”）
+  let best = "qr";
+  let bestD = Infinity;
+
+  if (qrBBox) {
+    bestD = dist2(p, bboxCenter(qrBBox));
+  }
+  if (textBBox) {
+    const d = dist2(p, bboxCenter(textBBox));
+    if (d < bestD) {
+      bestD = d;
+      best = "text";
+    }
+  }
+  return best;
+}
+
+function clearLongPress() {
+  if (longPressTimer) clearTimeout(longPressTimer);
+  longPressTimer = null;
+  pressStart = null;
+  movedTooMuch = false;
 }
 
 // --- 导出图片：优先系统分享，其次下载 ---
