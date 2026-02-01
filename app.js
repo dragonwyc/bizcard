@@ -145,20 +145,9 @@ function buildVCard() {
   );
 
   if (org) {
-    // vCard 2.1：ORG 推荐 company;department 形式（第二段可以为空）
-    const orgQP = `${qpEncodeUtf8(org)};`;
-  
-    // 1) 标准 ORG + WORK 类型（iOS 更容易接收）
     lines.push(
       foldVCardLine(
-        `ORG;WORK;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${orgQP}`
-      )
-    );
-  
-    // 2) iOS 兜底扩展字段（AddressBook 兼容）
-    lines.push(
-      foldVCardLine(
-        `X-ABORG;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${qpEncodeUtf8(org)}`
+        `TITLE;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${qpEncodeUtf8(org)}`
       )
     );
   }
