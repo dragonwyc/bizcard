@@ -114,86 +114,61 @@ function foldVCardLine(line, limit = 70) {
 }
 
 function buildVCard() {
-  const fullName = ($("name")?.value || "").trim();
-  const org      = ($("org")?.value || "").trim();
-  const title    = ($("title")?.value || "").trim();
-  const note     = ($("note")?.value || "").trim();
+  const fullName = ($("name")?.value || "").trim();      // 张小泉
+  const org      = ($("org")?.value || "").trim();       // 钢铁平台
+  const title    = ($("title")?.value || "").trim();     // 董事长
 
   const telCell  = ($("tel")?.value || "").trim();
   const email    = ($("email")?.value || "").trim();
   const url      = ($("url")?.value || "").trim();
 
-  const street   = ($("street")?.value || "").trim();
-  const city     = ($("city")?.value || "").trim();
-  const postal   = ($("postal")?.value || "").trim();
-  const country  = ($("country")?.value || "").trim();
-
-  const imWechat   = ($("wechat")?.value || "").trim();
-  const imTelegram = ($("telegram")?.value || "").trim();
-
-  const familyName = ($("familyName")?.value || "").trim();
-  const givenName  = ($("givenName")?.value || "").trim();
-
-  // iOS 更稳：FN 一定要有
-  const displayName =
-    fullName || [familyName, givenName].filter(Boolean).join(" ") || org || " ";
-
-  // NOTE：为了 iOS 不丢公司/职务，把它们也放进 NOTE 第一段（字段展示不稳定时有救）
-  let noteAll = "";
-  if (org || title) noteAll = `${org}${org && title ? " / " : ""}${title}`.trim();
-  if (note) noteAll = noteAll ? `${noteAll} | ${note}` : note;
-  if (imWechat) noteAll = noteAll ? `${noteAll} | WeChat: ${imWechat}` : `WeChat: ${imWechat}`;
-  if (imTelegram) noteAll = noteAll ? `${noteAll} | Telegram: ${imTelegram}` : `Telegram: ${imTelegram}`;
-
-  const nFamily = familyName || "";
-  const nGiven  = givenName || (fullName || "");
+  const familyName = ($("familyName")?.value || "").trim(); // Zhang / 张
+  const givenName  = ($("givenName")?.value || "").trim();  // San / 小泉
 
   const lines = [];
   lines.push("BEGIN:VCARD");
   lines.push("VERSION:2.1");
 
-  // iOS 通讯录偏好的一些扩展（可选但建议）
-  lines.push("X-ABShowAs:COMPANY");
+  // 1️⃣ 显示名：只给一个“最终显示”的中文
+  lines.push(
+    foldVCardLine(
+      `FN;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${qpEncodeUtf8(fullName)}`
+    )
+  );
 
-  lines.push(foldVCardLine(
-    `FN;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${qpEncodeUtf8(displayName)}`
-  ));
+  // 2️⃣ 结构化姓名：只用于系统索引（不要混合中英）
+  // 如果你主要用中文，就把中文放这里
+  lines.push(
+    foldVCardLine(
+      `N;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${qpEncodeUtf8(familyName)};${qpEncodeUtf8(givenName)};;;`
+    )
+  );
 
-  lines.push(foldVCardLine(
-    `N;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${qpEncodeUtf8(nFamily)};${qpEncodeUtf8(nGiven)};;;`
-  ));
-
+  // 3️⃣ 公司 / 职务：标准字段，各自独立
   if (org) {
-    lines.push(foldVCardLine(
-      `ORG;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${qpEncodeUtf8(org)}`
-    ));
-  }
-  if (title) {
-    lines.push(foldVCardLine(
-      `TITLE;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${qpEncodeUtf8(title)}`
-    ));
+    lines.push(
+      foldVCardLine(
+        `ORG;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${qpEncodeUtf8(org)}`
+      )
+    );
   }
 
+  if (title) {
+    lines.push(
+      foldVCardLine(
+        `TITLE;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${qpEncodeUtf8(title)}`
+      )
+    );
+  }
+
+  // 4️⃣ 联系方式（ASCII，不需要 QP）
   if (telCell) lines.push(`TEL;CELL:${telCell}`);
   if (email)   lines.push(`EMAIL:${email}`);
   if (url)     lines.push(`URL:${url}`);
 
-  if (street || city || postal || country) {
-    const adr =
-      `ADR;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:;;${qpEncodeUtf8(street)};${qpEncodeUtf8(city)};;${qpEncodeUtf8(postal)};${qpEncodeUtf8(country)}`;
-    lines.push(foldVCardLine(adr));
-  }
-
-  if (noteAll) {
-    lines.push(foldVCardLine(
-      `NOTE;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${qpEncodeUtf8(noteAll)}`
-    ));
-  }
-
   lines.push("END:VCARD");
   return lines.join("\r\n");
 }
-
 function escapeVC(s) {
   return String(s)
     .replace(/\\/g, "\\\\")
