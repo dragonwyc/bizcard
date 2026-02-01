@@ -114,34 +114,41 @@ function foldVCardLine(line, limit = 70) {
 }
 
 function buildVCard() {
-  const fullName = ($("name")?.value || "").trim();
-  const org      = ($("org")?.value || "").trim();
-  const title    = ($("title")?.value || "").trim();
+  const fullName = ($("name")?.value || "").trim();      // 你输入的中文姓名：张小泉
+  const org      = ($("org")?.value || "").trim();       // 钢铁平台
+  const title    = ($("title")?.value || "").trim();     // 董事长
 
   const telCell  = ($("tel")?.value || "").trim();
   const email    = ($("email")?.value || "").trim();
   const url      = ($("url")?.value || "").trim();
 
-  const familyName = ($("familyName")?.value || "").trim();
-  const givenName  = ($("givenName")?.value || "").trim();
-
-  // 显示名必须有
-  const displayName = fullName || [familyName, givenName].filter(Boolean).join(" ") || org || " ";
+  // ✅ 关键：不再信任 familyName/givenName 输入框，直接从 fullName 生成 N
+  // 这样不会被 “Zhang / 张” 这种字符污染，也不会出现 N 被判无效
+  let familyName = "";
+  let givenName = "";
+  if (fullName) {
+    familyName = fullName.slice(0, 1);
+    givenName = fullName.slice(1);
+  }
 
   const lines = [];
   lines.push("BEGIN:VCARD");
   lines.push("VERSION:2.1");
 
-  // iPhone 相机更稳：2.1 + QUOTED-PRINTABLE，但【不要折叠换行】
-  lines.push(`FN;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${qpEncodeUtf8(displayName)}`);
+  // ✅ 强制个人联系人模式（避免公司模式）
+  lines.push("X-ABShowAs:PERSON");
 
-  // N：建议你这里填“纯中文”或“纯英文”，不要写 "Zhang / 张" 这种带斜杠的混合串
+  // 显示名
+  lines.push(`FN;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${qpEncodeUtf8(fullName || " ")}`);
+
+  // ✅ iOS 关键：N 必须是合法的人名结构（姓;名）
   lines.push(`N;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${qpEncodeUtf8(familyName)};${qpEncodeUtf8(givenName)};;;`);
 
-  // ORG / TITLE：保持最朴素（不要 WORK，不要 X-ABORG），先确保 iPhone 能写入
+  // 公司 / 职位
   if (org)   lines.push(`ORG;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${qpEncodeUtf8(org)}`);
   if (title) lines.push(`TITLE;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${qpEncodeUtf8(title)}`);
 
+  // 联系方式
   if (telCell) lines.push(`TEL;CELL:${telCell}`);
   if (email)   lines.push(`EMAIL:${email}`);
   if (url)     lines.push(`URL:${url}`);
