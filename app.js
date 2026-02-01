@@ -147,7 +147,7 @@ function buildVCard() {
   if (org) {
     lines.push(
       foldVCardLine(
-        `TITLE;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${qpEncodeUtf8(org)}`
+        `ORG;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${qpEncodeUtf8(org)}`
       )
     );
   }
