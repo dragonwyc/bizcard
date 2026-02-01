@@ -114,53 +114,34 @@ function foldVCardLine(line, limit = 70) {
 }
 
 function buildVCard() {
-  const fullName = ($("name")?.value || "").trim();      // 张小泉
-  const org      = ($("org")?.value || "").trim();       // 钢铁平台
-  const title    = ($("title")?.value || "").trim();     // 董事长
+  const fullName = ($("name")?.value || "").trim();
+  const org      = ($("org")?.value || "").trim();
+  const title    = ($("title")?.value || "").trim();
 
   const telCell  = ($("tel")?.value || "").trim();
   const email    = ($("email")?.value || "").trim();
   const url      = ($("url")?.value || "").trim();
 
-  const familyName = ($("familyName")?.value || "").trim(); // Zhang / 张
-  const givenName  = ($("givenName")?.value || "").trim();  // San / 小泉
+  const familyName = ($("familyName")?.value || "").trim();
+  const givenName  = ($("givenName")?.value || "").trim();
+
+  // 显示名必须有
+  const displayName = fullName || [familyName, givenName].filter(Boolean).join(" ") || org || " ";
 
   const lines = [];
   lines.push("BEGIN:VCARD");
   lines.push("VERSION:2.1");
 
-  // 1️⃣ 显示名：只给一个“最终显示”的中文
-  lines.push(
-    foldVCardLine(
-      `FN;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${qpEncodeUtf8(fullName)}`
-    )
-  );
+  // iPhone 相机更稳：2.1 + QUOTED-PRINTABLE，但【不要折叠换行】
+  lines.push(`FN;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${qpEncodeUtf8(displayName)}`);
 
-  // 2️⃣ 结构化姓名：只用于系统索引（不要混合中英）
-  // 如果你主要用中文，就把中文放这里
-  lines.push(
-    foldVCardLine(
-      `N;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${qpEncodeUtf8(familyName)};${qpEncodeUtf8(givenName)};;;`
-    )
-  );
+  // N：建议你这里填“纯中文”或“纯英文”，不要写 "Zhang / 张" 这种带斜杠的混合串
+  lines.push(`N;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${qpEncodeUtf8(familyName)};${qpEncodeUtf8(givenName)};;;`);
 
-  if (org) {
-    lines.push(
-      foldVCardLine(
-        `ORG;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${qpEncodeUtf8(org)}`
-      )
-    );
-  }
+  // ORG / TITLE：保持最朴素（不要 WORK，不要 X-ABORG），先确保 iPhone 能写入
+  if (org)   lines.push(`ORG;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${qpEncodeUtf8(org)}`);
+  if (title) lines.push(`TITLE;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${qpEncodeUtf8(title)}`);
 
-  if (title) {
-    lines.push(
-      foldVCardLine(
-        `TITLE;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${qpEncodeUtf8(title)}`
-      )
-    );
-  }
-
-  // 4️⃣ 联系方式（ASCII，不需要 QP）
   if (telCell) lines.push(`TEL;CELL:${telCell}`);
   if (email)   lines.push(`EMAIL:${email}`);
   if (url)     lines.push(`URL:${url}`);
@@ -168,6 +149,7 @@ function buildVCard() {
   lines.push("END:VCARD");
   return lines.join("\r\n");
 }
+
 function escapeVC(s) {
   return String(s)
     .replace(/\\/g, "\\\\")
