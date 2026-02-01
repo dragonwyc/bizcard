@@ -68,6 +68,13 @@ let qrState = {
   scale: 1.0 // 相对尺寸
 };
 
+// ===== 文字可拖拽缩放参数（以 canvas 相对坐标 0~1）=====
+let textState = {
+  x: 0.08,    // 左上角相对位置
+  y: 0.10,
+  scale: 1.0  // 文字整体缩放
+};
+
 let locked = true;
 
 // 触摸手势
@@ -278,33 +285,70 @@ function drawTextOverlay(cw, ch) {
   const org = $("org").value.trim();
   const name = $("name").value.trim();
 
-  const pad = Math.round(Math.min(cw, ch) * 0.05);
-  const top = pad;
+  // 基础字号（跟你原来一样的比例）
+  const orgSize  = Math.round(ch * 0.055 * textState.scale);
+  const nameSize = Math.round(ch * 0.048 * textState.scale);
+  const tagSize  = Math.round(ch * 0.028 * textState.scale);
+
+  const x = Math.round(textState.x * cw);
+  const y = Math.round(textState.y * ch);
+
+  const gap1 = Math.round(ch * 0.06 * textState.scale);
+  const gap2 = Math.round(ch * 0.06 * textState.scale);
+  const gap3 = Math.round(ch * 0.045 * textState.scale);
 
   ctx.save();
   ctx.shadowColor = "rgba(0,0,0,0.35)";
   ctx.shadowBlur = 10;
+  ctx.fillStyle = "white";
 
-  // 公司（更大）
+  let cursorY = y;
+
+  // 计算 bbox（先测量宽度）
+  let maxW = 0;
+  let totalH = 0;
+
   if (org) {
-    ctx.font = `800 ${Math.round(ch * 0.055)}px -apple-system,BlinkMacSystemFont,Segoe UI,Roboto`;
-    ctx.fillStyle = "white";
-    ctx.fillText(org, pad, top + Math.round(ch * 0.06));
+    ctx.font = `800 ${orgSize}px -apple-system,BlinkMacSystemFont,Segoe UI,Roboto`;
+    maxW = Math.max(maxW, ctx.measureText(org).width);
+    totalH += gap1;
   }
-
-  // 姓名
   if (name) {
-    ctx.font = `700 ${Math.round(ch * 0.048)}px -apple-system,BlinkMacSystemFont,Segoe UI,Roboto`;
-    ctx.fillStyle = "white";
-    ctx.fillText(name, pad, top + Math.round(ch * 0.12));
+    ctx.font = `700 ${nameSize}px -apple-system,BlinkMacSystemFont,Segoe UI,Roboto`;
+    maxW = Math.max(maxW, ctx.measureText(name).width);
+    totalH += gap2;
   }
+  const tag = "BUSINESS CARD";
+  ctx.font = `700 ${tagSize}px -apple-system,BlinkMacSystemFont,Segoe UI,Roboto`;
+  maxW = Math.max(maxW, ctx.measureText(tag).width);
+  totalH += gap3;
 
-  // BUSINESS CARD（小字，作为标识）
-  ctx.font = `700 ${Math.round(ch * 0.028)}px -apple-system,BlinkMacSystemFont,Segoe UI,Roboto`;
+  // 真正绘制
+  if (org) {
+    ctx.font = `800 ${orgSize}px -apple-system,BlinkMacSystemFont,Segoe UI,Roboto`;
+    cursorY += gap1;
+    ctx.fillText(org, x, cursorY);
+  }
+  if (name) {
+    ctx.font = `700 ${nameSize}px -apple-system,BlinkMacSystemFont,Segoe UI,Roboto`;
+    cursorY += gap2;
+    ctx.fillText(name, x, cursorY);
+  }
+  ctx.font = `700 ${tagSize}px -apple-system,BlinkMacSystemFont,Segoe UI,Roboto`;
+  cursorY += gap3;
   ctx.fillStyle = "rgba(255,255,255,0.92)";
-  ctx.fillText("BUSINESS CARD", pad, top + Math.round(ch * 0.165));
+  ctx.fillText(tag, x, cursorY);
 
   ctx.restore();
+
+  // bbox：给一点 padding，方便点选
+  const pad = Math.round(16 * (canvas.width / canvas.getBoundingClientRect().width)); // 约等于16px*dpr
+  const left = x - pad;
+  const top = y - pad;
+  const right = x + maxW + pad;
+  const bottom = y + totalH + pad;
+
+  return { left, top, right, bottom };
 }
 
 // --- 主渲染 ---
