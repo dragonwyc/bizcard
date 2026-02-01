@@ -61,8 +61,6 @@ let bgImg = null;
 let logoImg = null;
 let qrImg = null; // 用 Image 存放生成后的二维码图
 let textBBox = null;
-
-let textBBox = null;
 let qrBBox = null;
 
 let pinchTarget = null;     // "qr" | "text"
@@ -613,11 +611,6 @@ function hitBBox(p, box) {
   return p.x >= box.left && p.x <= box.right && p.y >= box.top && p.y <= box.bottom;
 }
 
-function hitBBox(p, box) {
-  if (!box) return false;
-  return p.x >= box.left && p.x <= box.right && p.y >= box.top && p.y <= box.bottom;
-}
-
 function bboxCenter(box) {
   return { x: (box.left + box.right) / 2, y: (box.top + box.bottom) / 2 };
 }
@@ -688,22 +681,22 @@ $("export").addEventListener("click", async () => {
   alert("已下载图片。iPhone 若未保存到相册，可在文件/分享里选择“存储图像”。");
 });
 
-// ===== 编辑面板 折叠 / 展开 =====
-const panel = document.getElementById("panel");
-const togglePanelBtn = document.getElementById("togglePanel");
+// ===== 编辑面板 折叠 / 展开（更稳：等 DOM 就绪再绑定）=====
+window.addEventListener("DOMContentLoaded", () => {
+  const panel = document.getElementById("panel");
+  const togglePanelBtn = document.getElementById("togglePanel");
 
-if (panel && togglePanelBtn) {
-  togglePanelBtn.addEventListener("click", () => {
-    panel.classList.toggle("collapsed");
-
-    // 折叠 / 展开后，画布高度会变化
-    resizeCanvas();
-    setTimeout(resizeCanvas, 200);
-  });
+  if (!panel || !togglePanelBtn) return;
 
   // 页面首次进入：默认折叠（预览优先）
   panel.classList.add("collapsed");
-}
+
+  togglePanelBtn.addEventListener("click", () => {
+    panel.classList.toggle("collapsed");
+    resizeCanvas();
+    setTimeout(resizeCanvas, 200);
+  });
+});
 
 // ===== 输入变化自动刷新（防抖）=====
 let regenTimer = null;
