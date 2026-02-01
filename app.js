@@ -118,9 +118,9 @@ function buildVCard() {
   const org      = ($("org")?.value || "").trim();
   const title    = ($("title")?.value || "").trim();
 
-  const telCell  = ($("tel")?.value || "").trim();
-  const email    = ($("email")?.value || "").trim();
-  const url      = ($("url")?.value || "").trim();
+  const telCell  = cleanTel(($("tel")?.value || ""));
+  const email    = cleanEmail(($("email")?.value || ""));
+  const url      = cleanUrl(($("url")?.value || ""));
 
   // 👇 读取“可选”的手动输入
   let familyName = ($("familyName")?.value || "").trim();
@@ -197,6 +197,28 @@ function escapeVC(s) {
     .replace(/,/g, "\\,");
 }
 
+function cleanTel(s) {
+  // 只允许电话常见字符：数字、+、#、*、括号、空格、短横线
+  return String(s || "")
+    .replace(/[\u00A0\u2000-\u200B\u202F\u3000]/g, " ") // 各种怪空格 → 普通空格
+    .replace(/[^\d+\-()#* ]/g, "")                     // 删除非允许字符
+    .trim();
+}
+
+function cleanEmail(s) {
+  return String(s || "")
+    .replace(/[\u00A0\u2000-\u200B\u202F\u3000]/g, "")
+    .replace(/\s+/g, "")
+    .trim();
+}
+
+function cleanUrl(s) {
+  let t = String(s || "").trim();
+  t = t.replace(/[\u00A0\u2000-\u200B\u202F\u3000]/g, "");
+  // 用户只填了域名时，帮他补 http(s)（iOS 更愿意识别）
+  if (t && !/^https?:\/\//i.test(t)) t = "http://" + t;
+  return t;
+}
 
 // 用 qrcodejs 生成二维码，并返回一个 Image（与你现有贴 logo 的流程兼容）
 // --- 生成二维码图（qrcodejs 1.0.0，支持中文 vCard）---
