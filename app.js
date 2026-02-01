@@ -1,3 +1,51 @@
+// ===== qrcodejs 1.0.0 中文 UTF-8 补丁（必须在任何 new QRCode 之前执行）=====
+(function () {
+  if (!window.QRCode) return;
+
+  // 用 TextEncoder 把字符串变成 UTF-8 bytes（最稳）
+  if (window.TextEncoder) {
+    QRCode.stringToBytes = function (s) {
+      return Array.from(new TextEncoder().encode(String(s)));
+    };
+    return;
+  }
+
+  // 兜底：手写 UTF-8 编码（兼容极旧浏览器）
+  QRCode.stringToBytes = function (s) {
+    s = String(s);
+    var bytes = [];
+    for (var i = 0; i < s.length; i++) {
+      var code = s.charCodeAt(i);
+
+      // surrogate pair (emoji etc.)
+      if (0xD800 <= code && code <= 0xDBFF && i + 1 < s.length) {
+        var next = s.charCodeAt(i + 1);
+        if (0xDC00 <= next && next <= 0xDFFF) {
+          code = 0x10000 + ((code - 0xD800) << 10) + (next - 0xDC00);
+          i++;
+        }
+      }
+
+      if (code <= 0x7F) {
+        bytes.push(code);
+      } else if (code <= 0x7FF) {
+        bytes.push(0xC0 | (code >> 6));
+        bytes.push(0x80 | (code & 0x3F));
+      } else if (code <= 0xFFFF) {
+        bytes.push(0xE0 | (code >> 12));
+        bytes.push(0x80 | ((code >> 6) & 0x3F));
+        bytes.push(0x80 | (code & 0x3F));
+      } else {
+        bytes.push(0xF0 | (code >> 18));
+        bytes.push(0x80 | ((code >> 12) & 0x3F));
+        bytes.push(0x80 | ((code >> 6) & 0x3F));
+        bytes.push(0x80 | (code & 0x3F));
+      }
+    }
+    return bytes;
+  };
+})();
+
 // --- PWA: 注册 Service Worker ---
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
@@ -107,57 +155,40 @@ function escapeVC(s) {
     .replace(/,/g, "\\,");
 }
 
-// ===== UTF-8 安全编码：给 qrcodejs 用 =====
-function utf8ToBinaryString(str) {
-  const bytes = new TextEncoder().encode(str);
-  let out = "";
-  for (let i = 0; i < bytes.length; i++) {
-    out += String.fromCharCode(bytes[i]);
-  }
-  return out;
-}
 
 // 用 qrcodejs 生成二维码，并返回一个 Image（与你现有贴 logo 的流程兼容）
-// --- 生成二维码图（qrcode 库：原生 UTF-8，支持中文 vCard） ---
-// --- 生成二维码图（qrcode 库：UTF-8，支持中文 vCard） ---
+// --- 生成二维码图（qrcodejs 1.0.0，支持中文 vCard）---
 async function generateQRImage(text) {
-  const QR = window.__QR_LIB__;
-
-  // 两种常见 API：toDataURL / toCanvas
-  const hasToDataURL = QR && typeof QR.toDataURL === "function";
-  const hasToCanvas  = QR && typeof QR.toCanvas === "function";
-
-  if (!hasToDataURL && !hasToCanvas) {
-    alert("二维码库未加载或API不匹配：请打开控制台查看 [QR LIB] 输出，以及 Network 是否成功加载 browser.min.js");
-    throw new Error("QR library not loaded / API mismatch");
+  if (!window.QRCode) {
+    alert("二维码库未加载：window.QRCode 不存在。");
+    throw new Error("QRCode (qrcodejs) not loaded");
   }
 
-  // 优先用 toDataURL（最省事）
-  if (hasToDataURL) {
-    const dataUrl = await QR.toDataURL(text, {
-      errorCorrectionLevel: "H",
-      width: 1024,
-      margin: 2,
-    });
+  const tmp = document.createElement("div");
+  tmp.style.position = "fixed";
+  tmp.style.left = "-99999px";
+  tmp.style.top = "-99999px";
+  document.body.appendChild(tmp);
+  tmp.innerHTML = "";
 
-    const img = new Image();
-    img.src = dataUrl;
-    await new Promise((resolve, reject) => {
-      img.onload = resolve;
-      img.onerror = reject;
-    });
-    return img;
-  }
-
-  // 兜底：用 toCanvas 再转成 dataURL
-  const tmpCanvas = document.createElement("canvas");
-  await QR.toCanvas(tmpCanvas, text, {
-    errorCorrectionLevel: "H",
-    width: 1024,
-    margin: 2,
+  // 注意：这里直接传 text（补丁会确保 UTF-8 编码）
+  new QRCode(tmp, {
+    text,
+    width: 768,
+    height: 768,
+    correctLevel: QRCode.CorrectLevel.H,
   });
 
-  const dataUrl = tmpCanvas.toDataURL("image/png");
+  await new Promise((r) => requestAnimationFrame(r));
+
+  const c = tmp.querySelector("canvas");
+  if (!c) {
+    document.body.removeChild(tmp);
+    throw new Error("qrcodejs did not render a canvas");
+  }
+
+  const dataUrl = c.toDataURL("image/png");
+  document.body.removeChild(tmp);
 
   const img = new Image();
   img.src = dataUrl;
@@ -167,6 +198,7 @@ async function generateQRImage(text) {
   });
   return img;
 }
+
 // --- 画背景 cover（全屏裁切）---
 function drawCover(img, cw, ch) {
   const iw = img.width, ih = img.height;
