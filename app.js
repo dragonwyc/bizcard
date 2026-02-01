@@ -114,41 +114,73 @@ function foldVCardLine(line, limit = 70) {
 }
 
 function buildVCard() {
-  const fullName = ($("name")?.value || "").trim();      // 你输入的中文姓名：张小泉
-  const org      = ($("org")?.value || "").trim();       // 钢铁平台
-  const title    = ($("title")?.value || "").trim();     // 董事长
+  const fullName = ($("name")?.value || "").trim();
+  const org      = ($("org")?.value || "").trim();
+  const title    = ($("title")?.value || "").trim();
 
   const telCell  = ($("tel")?.value || "").trim();
   const email    = ($("email")?.value || "").trim();
   const url      = ($("url")?.value || "").trim();
 
-  // ✅ 关键：不再信任 familyName/givenName 输入框，直接从 fullName 生成 N
-  // 这样不会被 “Zhang / 张” 这种字符污染，也不会出现 N 被判无效
-  let familyName = "";
-  let givenName = "";
-  if (fullName) {
-    familyName = fullName.slice(0, 1);
-    givenName = fullName.slice(1);
+  // 👇 读取“可选”的手动输入
+  let familyName = ($("familyName")?.value || "").trim();
+  let givenName  = ($("givenName")?.value || "").trim();
+
+  /* =====================================================
+     关键逻辑：姓名来源决策
+     1️⃣ 手动输入优先
+     2️⃣ 否则从 fullName 自动拆
+  ===================================================== */
+
+  if (!familyName && !givenName) {
+    const nameForN = fullName || "";
+    const hasChinese = /[\u4E00-\u9FFF]/.test(nameForN);
+
+    if (nameForN) {
+      if (hasChinese) {
+        // 中文：姓=第一个字，名=剩下
+        familyName = nameForN.slice(0, 1);
+        givenName  = nameForN.slice(1);
+      } else {
+        // 英文：姓=最后一个单词，名=前面的
+        const parts = nameForN.split(/\s+/).filter(Boolean);
+        if (parts.length === 1) {
+          familyName = parts[0];
+          givenName  = "";
+        } else {
+          familyName = parts[parts.length - 1];
+          givenName  = parts.slice(0, -1).join(" ");
+        }
+      }
+    }
+  }
+
+  // 最终兜底，防止 N 为空（避免 iOS 公司模式）
+  if (!familyName && !givenName) {
+    familyName = fullName || " ";
+    givenName  = "";
   }
 
   const lines = [];
   lines.push("BEGIN:VCARD");
   lines.push("VERSION:2.1");
 
-  // ✅ 强制个人联系人模式（避免公司模式）
+  // ✅ 明确告诉 iOS：这是“个人联系人”
   lines.push("X-ABShowAs:PERSON");
 
-  // 显示名
-  lines.push(`FN;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${qpEncodeUtf8(fullName || " ")}`);
+  // 显示名：完全按你输入的来
+  lines.push(
+    `FN;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${qpEncodeUtf8(fullName || " ")}`
+  );
 
-  // ✅ iOS 关键：N 必须是合法的人名结构（姓;名）
-  lines.push(`N;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${qpEncodeUtf8(familyName)};${qpEncodeUtf8(givenName)};;;`);
+  // 结构化姓名：严格使用 family / given
+  lines.push(
+    `N;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${qpEncodeUtf8(familyName)};${qpEncodeUtf8(givenName)};;;`
+  );
 
-  // 公司 / 职位
   if (org)   lines.push(`ORG;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${qpEncodeUtf8(org)}`);
   if (title) lines.push(`TITLE;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${qpEncodeUtf8(title)}`);
 
-  // 联系方式
   if (telCell) lines.push(`TEL;CELL:${telCell}`);
   if (email)   lines.push(`EMAIL:${email}`);
   if (url)     lines.push(`URL:${url}`);
