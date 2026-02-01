@@ -60,6 +60,7 @@ const ctx = canvas.getContext("2d");
 let bgImg = null;
 let logoImg = null;
 let qrImg = null; // 用 Image 存放生成后的二维码图
+let textBBox = null;
 
 // 二维码可拖拽缩放参数（以 canvas 像素为单位）
 let qrState = {
@@ -78,7 +79,7 @@ let textState = {
 let locked = true;
 
 // 触摸手势
-let pointerMode = null; // "drag" | "pinch"
+let pointerMode = null; // "drag" | "dragText" | "pinch"
 let lastTouch = null;
 let pinchStart = null;
 
@@ -373,7 +374,7 @@ function render() {
     ctx.fillRect(0, 0, cw, ch);
   }
 
-  drawTextOverlay(cw, ch);
+  textBBox = drawTextOverlay(cw, ch);
 
   // 二维码
   if (qrImg) {
@@ -471,8 +472,10 @@ canvas.addEventListener("touchstart", (ev) => {
   ev.preventDefault();
   const ts = getTouches(ev);
   if (ts.length === 1) {
-    pointerMode = "drag";
-    lastTouch = ts[0];
+    const t = ts[0];
+    // 先判断点到文字还是二维码：点中文字 → 拖文字，否则拖二维码
+    pointerMode = hitBBox(t, textBBox) ? "dragText" : "dragQR";
+    lastTouch = t;
   } else if (ts.length >= 2) {
     pointerMode = "pinch";
     const a = ts[0], b = ts[1];
@@ -492,12 +495,19 @@ canvas.addEventListener("touchmove", (ev) => {
   const ts = getTouches(ev);
   const cw = canvas.width, ch = canvas.height;
 
-  if (pointerMode === "drag" && ts.length === 1 && lastTouch) {
+  if ((pointerMode === "dragQR" || pointerMode === "dragText") && ts.length === 1 && lastTouch) {
     const t = ts[0];
     const dx = t.x - lastTouch.x;
     const dy = t.y - lastTouch.y;
-    qrState.x = clamp01(qrState.x + dx / cw);
-    qrState.y = clamp01(qrState.y + dy / ch);
+
+    if (pointerMode === "dragQR") {
+      qrState.x = clamp01(qrState.x + dx / cw);
+      qrState.y = clamp01(qrState.y + dy / ch);
+    } else {
+      textState.x = clamp01(textState.x + dx / cw);
+      textState.y = clamp01(textState.y + dy / ch);
+    }
+
     lastTouch = t;
     render();
   }
@@ -532,6 +542,10 @@ canvas.addEventListener("touchend", (ev) => {
 
 function clamp01(v){ return Math.max(0, Math.min(1, v)); }
 function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+function hitBBox(p, box) {
+  if (!box) return false;
+  return p.x >= box.left && p.x <= box.right && p.y >= box.top && p.y <= box.bottom;
+}
 
 // --- 导出图片：优先系统分享，其次下载 ---
 $("export").addEventListener("click", async () => {
