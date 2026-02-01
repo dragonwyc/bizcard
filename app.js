@@ -118,37 +118,19 @@ function utf8ToBinaryString(str) {
 }
 
 // 用 qrcodejs 生成二维码，并返回一个 Image（与你现有贴 logo 的流程兼容）
-// --- 生成二维码图（使用 qrcodejs + UTF-8 补丁，支持中文） ---
+// --- 生成二维码图（qrcode 库：原生 UTF-8，支持中文 vCard） ---
 async function generateQRImage(text) {
-  if (!window.QRCode) {
-    alert("二维码库未加载：window.QRCode 不存在。请检查 qrcode.min.js 是否成功引入。");
-    throw new Error("QRCode (qrcodejs) not loaded");
+  if (!window.QRCode || typeof QRCode.toDataURL !== "function") {
+    alert("二维码库未加载：QRCode.toDataURL 不存在。请确认已引入 qrcode@1.5.4 的 browser.min.js。");
+    throw new Error("qrcode library not loaded");
   }
 
-  const tmp = document.createElement("div");
-  tmp.style.position = "fixed";
-  tmp.style.left = "-99999px";
-  tmp.style.top = "-99999px";
-  document.body.appendChild(tmp);
-  tmp.innerHTML = "";
-
-  const qr = new QRCode(tmp, {
-    text: text,                 // ✅ 直接用原始 vCard 字符串
-    width: 768,
-    height: 768,
-    correctLevel: QRCode.CorrectLevel.H,
+  // 生成 DataURL（库内部会按 UTF-8/多字节正确编码）
+  const dataUrl = await QRCode.toDataURL(text, {
+    errorCorrectionLevel: "H",
+    width: 1024,
+    margin: 2,
   });
-
-  await new Promise(r => requestAnimationFrame(r));
-
-  const canvas = tmp.querySelector("canvas");
-  if (!canvas) {
-    document.body.removeChild(tmp);
-    throw new Error("qrcodejs did not render a canvas");
-  }
-
-  const dataUrl = canvas.toDataURL("image/png");
-  document.body.removeChild(tmp);
 
   const img = new Image();
   img.src = dataUrl;
@@ -156,7 +138,6 @@ async function generateQRImage(text) {
     img.onload = resolve;
     img.onerror = reject;
   });
-
   return img;
 }
 // --- 画背景 cover（全屏裁切）---
