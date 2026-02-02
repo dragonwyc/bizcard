@@ -215,11 +215,20 @@ function escapeVC(s) {
 }
 
 function cleanTel(s) {
-  // 只允许电话常见字符：数字、+、#、*、括号、空格、短横线
-  return String(s || "")
-    .replace(/[\u00A0\u2000-\u200B\u202F\u3000]/g, " ") // 各种怪空格 → 普通空格
-    .replace(/[^\d+\-()#* ]/g, "")                     // 删除非允许字符
-    .trim();
+  let t = String(s || "");
+
+  // 去掉各种怪空格 + 普通空格
+  t = t.replace(/[\u00A0\u2000-\u200B\u202F\u3000\s]/g, "");
+
+  // 只保留：数字 和 +
+  t = t.replace(/[^\d+]/g, "");
+
+  // 如果有多个 +，只保留最前面的那个
+  if (t.includes("+")) {
+    t = "+" + t.replace(/\+/g, "").replace(/^\+/, "");
+  }
+
+  return t;
 }
 
 function cleanEmail(s) {
