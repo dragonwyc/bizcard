@@ -38,11 +38,20 @@
   
     header{
       padding: var(--pad);
-      background: var(--panel);
       position: sticky;
       top: 0;
       z-index: 10;
-      border-bottom: 1px solid rgba(255,255,255,.06);
+
+      /* ✅ 半透明浮层（不再遮挡预览） */
+      background: rgba(10,10,10,.42);
+      border-bottom: 1px solid rgba(255,255,255,.10);
+
+      /* ✅ 毛玻璃效果（iOS Safari 支持） */
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+
+      /* ✅ 让边缘更“卡片感” */
+      box-shadow: 0 10px 24px rgba(0,0,0,.28);
     }
   
     /* 表单：手机单列，宽屏双列 */
